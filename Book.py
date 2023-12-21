@@ -8,7 +8,6 @@ def lowercase_input_decorator(func):
         return ans.lower() if ans else ans
     return wrapper
 
-
 class LibraryApp(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -20,7 +19,6 @@ class LibraryApp(tk.Tk):
             "user1": "1",
             "user2": "2"
         }
-
         self.users_book = {}
         self.user_role = {
             "admin": True,
@@ -28,25 +26,22 @@ class LibraryApp(tk.Tk):
             "user2": False
         }
 
-        self.book = {
-            "J.K Rowling": "Harry Potter",
-            "Finn the Human": "Adventure Time"
-        }
+        self.book = {}
 
         self.title("Humble Library")
 
+        # Load existing books and borrowed books from files
+        self.load_books_from_file()
+        self.load_borrowed_books_from_file()
+
         self.login_frame()
 
-
-
-    
     def login_frame(self):
         login_frame = tk.Frame(self)
-        login_frame.configure(bg="#292929")
         login_frame.pack(padx=10, pady=10)
-        
-        tk.Label(login_frame, text="Username:", fg="white", bg="#292929").grid(row=0, column=0)
-        tk.Label(login_frame, text="Password:", fg="white", bg="#292929").grid(row=1, column=0)
+
+        tk.Label(login_frame, text="Username:").grid(row=0, column=0)
+        tk.Label(login_frame, text="Password:").grid(row=1, column=0)
 
         username_entry = tk.Entry(login_frame)
         password_entry = tk.Entry(login_frame, show="*")
@@ -139,23 +134,25 @@ class LibraryApp(tk.Tk):
 
         if author and title:
             self.book[author] = title
+            self.save_books_to_file()  # Save books to file
             messagebox.showinfo("Success", "Successfully added a book!")
             messagebox.showinfo("Books", self.show_books(self.book))
         else:
             messagebox.showinfo("Error", "Author and title cannot be empty.")
+
 
     def check_borrowed_book(self, user_book):
         messagebox.showinfo("Borrowed Books", self.show_books(user_book))
 
     def check_data(self, available_books):
         messagebox.showinfo("Available Books", self.show_books(available_books))
-        
+
     @lowercase_input_decorator
     def get_user_input(self, title, prompt):
         return simpledialog.askstring(title, prompt)
     
     def borrow_book(self):
-        messagebox.showinfo("Books available for borrowing", self.show_books(self.book))
+        messagebox.showinfo("Books available for borrowing", self.show_available_books(self.book))
 
         ans = self.get_user_input("Borrow Book", "Enter the book title to borrow:")
 
@@ -168,6 +165,7 @@ class LibraryApp(tk.Tk):
                 messagebox.showinfo("Error", f"Book already borrowed by {already_borrowed[0][1]}")
             else:
                 self.users_book[found_book] = self.currentUser
+                self.save_borrowed_books_to_file()  # Save borrowed books to file
                 self.borrowed_book()
         else:
             messagebox.showinfo("Error", "Book not found.")
@@ -176,18 +174,27 @@ class LibraryApp(tk.Tk):
         messagebox.showinfo("Borrowed Books", self.show_borrowed_books(self.currentUser, self.users_book))
 
     def return_book(self):
-        messagebox.showinfo("Books borrowed by", f"{self.currentUser}:\n{self.show_borrowed_books(self.currentUser, self.users_book)}")
+        borrowed_books = [item for item in self.users_book.items() if item[1] == self.currentUser]
 
-        book_to_return = simpledialog.askstring("Return Book", "Enter the book title to return:")
+        if borrowed_books:
+            titles = [item[0][1] for item in borrowed_books]
+            borrowed_titles = reduce(lambda acc, title: acc + ", " + title, titles)
+        
+            messagebox.showinfo("Books borrowed by", f"{self.currentUser}:\n{borrowed_titles}")
 
-        book_found = list(filter(lambda item: item[1] == book_to_return, self.users_book.items()))
+            book_to_return = self.get_user_input("Return Book", "Enter the book title to return:")
 
-        if book_found:
-            book_found = book_found[0][0]
-            del self.users_book[book_found]
-            messagebox.showinfo("Success", f"You've returned the book: {book_found[0]} : {book_found[1]}")
+            book_found = [item for item in borrowed_books if item[0][1].lower() == book_to_return]
+
+            if book_found:
+                returned_book = book_found[0][0]
+                del self.users_book[returned_book]
+                self.save_borrowed_books_to_file()
+                messagebox.showinfo("Success", f"You've returned the book: {returned_book[0]} : {returned_book[1]}")
+            else:
+                messagebox.showinfo("Error", "You don't have a book with that title.")
         else:
-            messagebox.showinfo("Error", "You don't have a book with that title.")
+            messagebox.showinfo("No Borrowed Books", "You haven't borrowed any books.")
 
     def show_books(self, books):
         def print_book(item):
@@ -206,7 +213,49 @@ class LibraryApp(tk.Tk):
         else:
             return f"{user} has not borrowed any books."
 
+    def save_books_to_file(self):
+        with open("books.txt", "w") as file:
+            for author, title in self.book.items():
+                file.write(f"{author}:{title}\n")
+
+    def save_borrowed_books_to_file(self):
+        with open("borrowed_books.txt", "w") as file:
+            for (author, title), user in self.users_book.items():
+                file.write(f"{author}:{title}:{user}\n")
+
+    def load_books_from_file(self):
+        try:
+            with open("books.txt", "r") as file:
+                for line in file:
+                    author, title = line.strip().split(":")
+                    self.book[author] = title
+        except FileNotFoundError:
+            pass
+
+    def load_borrowed_books_from_file(self):
+        try:
+            with open("borrowed_books.txt", "r") as file:
+                for line in file:
+                    author, title, user = line.strip().split(":")
+                    self.users_book[(author, title)] = user
+        except FileNotFoundError:
+            pass
+
+    def show_available_books(self, books):
+        available_books = [item for item in books.items() if item not in self.users_book]
+        
+        if available_books:
+            def print_book(item):
+                return f"{item[0]}: {item[1]}"
+
+            book_list = list(map(print_book, available_books))
+            return '\n'.join(book_list)
+        else:
+            return "All books have been borrowed."
+
+
+
+
 if __name__ == "__main__":
     app = LibraryApp()
-    app.configure(bg="#292929")
     app.mainloop()
