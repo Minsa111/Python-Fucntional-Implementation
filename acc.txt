@@ -1,3 +1,0 @@
-admin: 12345
-user1: 1
-user2: 2
