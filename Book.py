@@ -110,7 +110,7 @@ class LibraryApp(tk.Tk):
         elif option == "Check Borrowed Book":
             self.check_borrowed_book(self.users_book)
         elif option == "Check All Book":
-            self.check_data(self.book)
+            self.check_data(self.book, self.custom_format)
         elif option == "Log Out":
             self.currentUser = None
             self.clear_frame()
@@ -144,8 +144,8 @@ class LibraryApp(tk.Tk):
     def check_borrowed_book(self, user_book):
         messagebox.showinfo("Borrowed Books", self.show_books(user_book))
 
-    def check_data(self, available_books):
-        messagebox.showinfo("Available Books", self.show_books(available_books))
+    def check_data(self, available_books, format_function=None):
+        messagebox.showinfo("Available Books", self.show_books(available_books, format_function=format_function))
 
     @lowercase_input_decorator
     def get_user_input(self, title, prompt):
@@ -196,12 +196,18 @@ class LibraryApp(tk.Tk):
         else:
             messagebox.showinfo("No Borrowed Books", "You haven't borrowed any books.")
 
-    def show_books(self, books):
-        def print_book(item):
-            return f"{item[0]}: {item[1]}"
+    def show_books(self, books, format_function=None):
+        def format_book(item):
+            if format_function:
+                return format_function(item[0], item[1])
+            else:
+                return f"{item[0]}: {item[1]}"
 
-        book_list = list(map(print_book, books.items()))
+        book_list = list(map(format_book, books.items()))
         return '\n'.join(book_list)
+    @staticmethod
+    def custom_format(author, title):
+        return f"Book: {title} (Author: {author})"
 
     def show_borrowed_books(self, user, user_book):
         borrowed_books = list(filter(lambda item: item[1] == user, user_book.items()))
